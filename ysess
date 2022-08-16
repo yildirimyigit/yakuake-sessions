@@ -4,8 +4,8 @@
 import subprocess as sp, os, math, sys, re
 import subprocess
 import time
-from ConfigParser import ConfigParser
-from cStringIO import StringIO
+from configparser import ConfigParser
+from io import StringIO
 from optparse import OptionParser
 
 import dbus
@@ -37,8 +37,10 @@ class SortedDict(dict):
         for key in self.keyOrder:
             yield self[key]
     def __setitem__(self, key, val):
-        self.keyOrder.append(key)
-        dict.__setitem__(self, key, val)
+        #print(type(self.keyOrder))
+        #self.keyOrder.append(key)
+        #dict.__setitem__(self, key, val)
+        self.update({key: val})
     def __delitem__(self, key):
         self.keyOrder.remove(key)
         dict.__delitem__(self, key)
@@ -66,11 +68,11 @@ def get_yakuake(cmd):
 
 def get_sessions():
     tabs = []
-    sessnum = len(get_yakuake('/yakuake/sessions terminalIdList').split(','))
+    sessnum = len(get_yakuake('/yakuake/sessions terminalIdList').decode("utf-8").split(','))
     activesess = int(get_yakuake('/yakuake/sessions activeSessionId'))
 
-    sessions = sorted(int(i) for i in get_yakuake('/yakuake/sessions sessionIdList').split(','))
-    ksessions = sorted(int(line.split('/')[-1]) for line in get_yakuake('').split('\n') if '/Sessions/' in line)
+    sessions = sorted(int(i) for i in get_yakuake('/yakuake/sessions sessionIdList').decode("utf-8").split(','))
+    ksessions = sorted(int(line.split('/')[-1]) for line in get_yakuake('').decode("utf-8").split('\n') if '/Sessions/' in line)
     session_map = dict(zip(sessions, ksessions))
     last_tabid = None
 
@@ -94,8 +96,8 @@ def get_sessions():
             'tabid': tabid,
             'active': sessid == activesess,
             'split': split,
-            'cwd': get_stdout('pwdx '+pid).partition(' ')[2],
-            'cmd': '' if fgpid == pid else get_stdout('ps '+fgpid, env={'PS_FORMAT': 'command'}).split('\n')[-1],
+            'cwd': get_stdout('pwdx '+pid.decode("utf-8")).decode("utf-8").partition(' ')[2],
+            'cmd': '' if fgpid == pid else get_stdout('ps '+fgpid.decode("utf-8"), env={'PS_FORMAT': 'command'}).decode("utf-8").split('\n')[-1],
         })
     return tabs
 
@@ -106,9 +108,9 @@ def format_sessions(tabs, fp):
     for i, tab in enumerate(tabs):
         section = ('Tab %%0%dd' % tabpad) % (i+1)
         cp.add_section(section)
-        cp.set(section, 'title', tab['title'])
-        cp.set(section, 'active', 1 if tab['active'] else 0)
-        cp.set(section, 'tab', tab['tabid'])
+        cp.set(section, 'title', tab['title'].decode("utf-8"))
+        cp.set(section, 'active', str(1 if tab['active'] else 0))
+        cp.set(section, 'tab', str(tab['tabid']))
         cp.set(section, 'split', tab['split'])
         cp.set(section, 'cwd', tab['cwd'])
         cp.set(section, 'cmd', tab['cmd'])
@@ -126,7 +128,7 @@ def load_sessions(file):
     cp.readfp(file)
     sections = cp.sections()
     if not sections:
-        print >>sys.stderr, "No tab info found, aborting"
+        print(sys.stderr, "No tab info found, aborting")
         sys.exit(1)
 
     # Clear existing sessions, but only if we have good info (above)
@@ -203,7 +205,7 @@ if __name__ == '__main__':
         fp = sys.stdin
         if opts.infile and opts.infile != '-':
             if not os.path.exists(opts.infile):
-                print >>sys.stderr, "ERROR: Input file (%s) does not exist." % opt.infile
+                print(sys.stderr, "ERROR: Input file (%s) does not exist." % opt.infile)
                 sys.exit(1)
             fp = open(opts.infile, 'r')
         load_sessions(fp)
